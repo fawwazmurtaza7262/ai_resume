@@ -156,7 +156,7 @@ def analyze(self, resume: str, job: str) -> AnalysisResult:
     def _tfidf_similarity(self, resume: str, job: str) -> float:
         try:
             vec = TfidfVectorizer(ngram_range=(1,2))
-            tfidf = vectorizer.fit_transform([resume, job])
+            tfidf = vec.fit_transform([resume, job]) 
             return cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]
         except Exception:
             return 0.0
@@ -274,5 +274,5 @@ def analyze(self, resume: str, job: str) -> AnalysisResult:
                     "it can significantly boost your candidacy for this role."
                 )
  
-    return tips
+        return tips
         
