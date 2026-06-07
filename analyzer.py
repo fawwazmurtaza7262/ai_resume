@@ -140,4 +140,139 @@ def analyze(self, resume: str, job: str) -> AnalysisResult:
             lines.append(f"{i}. {s}")
         lines += ["\n" + "=" * 60]
         return "\n".join(lines)
+    
+ # ── Private helpers ────────────────────────────────────────────────────────
+    def _preprocess(self, text: str) -> str:
+        text = text.lower()
+        text = re.sub(r"[^a-z0-9\s]", " ", text)
+        tokens = text.split()
+        tokens = [t for t in tokens if t not in self._stop and len(t) > 1]
+        try:
+            tokens = [self._lemmatizer.lemmatize(t) for t in tokens]
+        except Exception:
+            pass
+        return " ".join(tokens)
+    
+    def _tfidf_similarity(self, resume: str, job: str) -> float:
+        try:
+            vec = TfidfVectorizer(ngram_range=(1,2))
+            tfidf = vectorizer.fit_transform([resume, job])
+            return cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]
+        except Exception:
+            return 0.0
+    
+    def _skill_gap(self, resume_raw: str, job_raw: str) -> tuple[set[str], set[str]]:
+        """Return (found_skills, missing_skills) using multi-word matching."""
+        job_skills: set[str] = set()
+        for skill in SKILL_KEYWORDS:
+            pattern = r"\b" + re.escape(skill) + r"\b"
+            if re.search(pattern, job_raw):
+                job_skills.add(skill)
+ 
+        found: set[str] = set()
+        missing: set[str] = set()
+        for skill in job_skills:
+            pattern = r"\b" + re.escape(skill) + r"\b"
+            if re.search(pattern, resume_raw):
+                found.add(skill)
+            else:
+                missing.add(skill)
+ 
+        return found, missing
+ 
+    def _keyword_coverage(self, resume_clean: str, job_clean: str) -> int:
+        job_words = set(job_clean.split())
+        resume_words = set(resume_clean.split())
+        if not job_words:
+            return 0
+        overlap = job_words & resume_words
+        return min(100, round(len(overlap) / len(job_words) * 100))
+ 
+    def _generate_suggestions(
+        self,
+        score: int,
+        found: set[str],
+        missing: set[str],
+        resume_raw: str,
+        job_raw: str,
+    ) -> list[str]:
+        tips: list[str] = []
+ 
+        # Skill-based tips
+        if missing:
+            top_missing = sorted(missing)[:6]
+            tips.append(
+                f"Add the following missing skills to your resume (or a skills section): "
+                f"{', '.join(top_missing)}."
+            )
+ 
+        # Score-based tips
+        if score < 40:
+            tips.append(
+                "Your overall match is low. Consider tailoring your resume "
+                "more closely to this specific role by mirroring the job description's language."
+            )
+        elif score < 65:
+            tips.append(
+                "Your match is moderate. Strengthen alignment by incorporating "
+                "more of the job's key phrases into your bullet points."
+            )
+        else:
+            tips.append(
+                "Strong match! Fine-tune your summary section to directly echo "
+                "the job's top-priority requirements."
+            )
+ 
+        # Quantification check
+        numbers = re.findall(r"\b\d+[%x]?\b", resume_raw)
+        if len(numbers) < 3:
+            tips.append(
+                "Quantify your achievements — recruiters respond to metrics. "
+                "E.g. 'Reduced load time by 40%' or 'Managed a team of 8 engineers'."
+            )
+ 
+        # Resume length check
+        word_count = len(resume_raw.split())
+        if word_count < 250:
+            tips.append(
+                "Your resume appears short. Expand your experience bullets with "
+                "action verbs, tools used, and measurable outcomes."
+            )
+        elif word_count > 900:
+            tips.append(
+                "Your resume is quite long. Aim for one page (≈400–600 words) "
+                "for <10 years of experience to keep recruiters engaged."
+            )
+ 
+        # Action verbs check
+        action_verbs = {
+            "built", "developed", "led", "designed", "implemented", "improved",
+            "reduced", "increased", "created", "managed", "optimized", "deployed",
+        }
+        resume_lower = resume_raw.lower()
+        used_verbs = action_verbs & set(resume_lower.split())
+        if len(used_verbs) < 3:
+            tips.append(
+                "Use strong action verbs at the start of bullet points: "
+                "Built, Designed, Optimized, Led, Deployed, etc."
+            )
+ 
+        # Summary check
+        has_summary = any(w in resume_lower for w in ["summary", "objective", "profile", "about"])
+        if not has_summary:
+            tips.append(
+                "Add a 2–3 sentence professional summary at the top of your resume "
+                "that directly targets this role."
+            )
+ 
+        # Certifications
+        if "certified" not in resume_lower and "certification" not in resume_lower:
+            relevant_certs = [s for s in missing if s in ("aws", "azure", "gcp", "kubernetes", "docker")]
+            if relevant_certs:
+                tips.append(
+                    f"Consider earning a certification in {relevant_certs[0].upper()} — "
+                    "it can significantly boost your candidacy for this role."
+                )
+ 
+    return tips
         
