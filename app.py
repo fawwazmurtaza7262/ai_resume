@@ -185,4 +185,97 @@ with col2:
     )
  
 st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
+# ── Analyze button ─────────────────────────────────────────────────────────────
+_, btn_col, _ = st.columns([2, 2, 2])
+with btn_col:
+    analyze = st.button("Analyze Match →")
+ 
+# ── Results ───────────────────────────────────────────────────────────────────
+if analyze:
+    if not resume_text:
+        st.error("Please upload a resume first.")
+    elif not job_text.strip():
+        st.error("Please paste a job description.")
+    else:
+        with st.spinner("Analyzing…"):
+            results = analyzer.analyze(resume_text, job_text)
+ 
+        score = results["score"]
+        found_skills = results["found_skills"]
+        missing_skills = results["missing_skills"]
+        suggestions = results["suggestions"]
+        keyword_coverage = results["keyword_coverage"]
+ 
+        # Score color
+        if score >= 75:
+            score_color = "#00ff88"
+        elif score >= 50:
+            score_color = "#ffd700"
+        else:
+            score_color = "#ff4d4d"
+ 
+        # ── Top metrics row
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="score-ring" style="color:{score_color}">{score}%</div>
+                <div class="score-label">Match Score</div>
+            </div>""", unsafe_allow_html=True)
+        with m2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="score-ring" style="color:#00c4ff">{len(found_skills)}</div>
+                <div class="score-label">Skills Matched</div>
+            </div>""", unsafe_allow_html=True)
+        with m3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="score-ring" style="color:#ff4d4d">{len(missing_skills)}</div>
+                <div class="score-label">Skills Missing</div>
+            </div>""", unsafe_allow_html=True)
+        with m4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="score-ring" style="color:#ffd700">{keyword_coverage}%</div>
+                <div class="score-label">Keyword Coverage</div>
+            </div>""", unsafe_allow_html=True)
+ 
+        st.markdown('<br>', unsafe_allow_html=True)
+        st.progress(score / 100)
+ 
+        # ── Skills breakdown
+        sc1, sc2 = st.columns(2, gap="large")
+        with sc1:
+            st.markdown('<div class="section-header">✓ Skills Found in Resume</div>', unsafe_allow_html=True)
+            if found_skills:
+                chips = "".join(f'<span class="skill-chip chip-found">{s}</span>' for s in sorted(found_skills))
+                st.markdown(chips, unsafe_allow_html=True)
+            else:
+                st.markdown('<span style="color:#555">No matching skills detected.</span>', unsafe_allow_html=True)
+ 
+        with sc2:
+            st.markdown('<div class="section-header">✗ Skills Missing from Resume</div>', unsafe_allow_html=True)
+            if missing_skills:
+                chips = "".join(f'<span class="skill-chip chip-missing">{s}</span>' for s in sorted(missing_skills))
+                st.markdown(chips, unsafe_allow_html=True)
+            else:
+                st.markdown('<span style="color:#555">No critical skills missing!</span>', unsafe_allow_html=True)
+ 
+        # ── Suggestions
+        st.markdown('<div class="section-header">💡 Improvement Suggestions</div>', unsafe_allow_html=True)
+        for tip in suggestions:
+            st.markdown(f'<div class="suggestion-card">{tip}</div>', unsafe_allow_html=True)
+ 
+        # ── Download report
+        st.markdown('<div class="section-header">Export</div>', unsafe_allow_html=True)
+        report = analyzer.build_report(score, found_skills, missing_skills, suggestions, keyword_coverage)
+        st.download_button(
+            "⬇  Download Report (.txt)",
+            data=report,
+            file_name="resume_analysis_report.txt",
+            mime="text/plain"
+        )
+ 
  
