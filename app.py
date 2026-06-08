@@ -154,4 +154,35 @@ div[data-testid="stTextArea"] textarea {
     margin: 2rem 0;
 }
 </style>
-""", unsafe_allow_html=True)    
+""", unsafe_allow_html=True) 
+
+# Headers
+st.markdown("<h1 class='hero-title'>Resume Analyzer</h1>", unsafe_allow_html=True)
+st.markdown("<div class='hero-sub'>// match · analyze · optimize</div>", unsafe_allow_html=True) 
+analyzer = ResumeAnalyzer()
+
+# Input columns
+col1, col2 = st.columns(2, gap="large")
+
+with col1:
+    st.markdown('<div class="section-header">01 — Resume</div>', unsafe_allow_html=True)
+    upload = st.file_uploader("Upload resume (.pdf or .txt)", type=["pdf", "txt"], label_visibility="collapsed")
+    resume_text = ""
+    if upload:
+        if upload.type == "application/pdf":
+            resume_text = analyzer.extract_pdf(upload.read())
+        else:
+            resume_text = upload.read().decode("utf-8", errors="ignore")
+        st.success(f"✓  {upload.name}  ({len(resume_text.split())} words)")
+ 
+with col2:
+    st.markdown('<div class="section-header">02 — Job Description</div>', unsafe_allow_html=True)
+    job_text = st.text_area(
+        "Paste job description",
+        height=200,
+        placeholder="Paste the full job description here…",
+        label_visibility="collapsed"
+    )
+ 
+st.markdown('<hr class="divider">', unsafe_allow_html=True)
+ 
